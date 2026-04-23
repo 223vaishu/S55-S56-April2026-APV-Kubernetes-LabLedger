@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   Plus, Search, X, ChevronUp, ChevronDown, ChevronsUpDown,
   Package, AlertTriangle, XCircle, Filter, FlaskConical, Loader2, Trash2, Edit2, RotateCw,
@@ -83,7 +83,7 @@ const InventoryModal: React.FC<ModalProps> = ({ onClose, onSave, initialData }) 
         category: form.category 
       });
       onClose();
-    } catch (err) {
+    } catch {
       setErrors({ submit: 'Failed to save item. Please try again.' });
     } finally {
       setIsSubmitting(false);
@@ -244,23 +244,23 @@ const InventoryPage: React.FC<{ searchQuery?: string }> = ({ searchQuery = '' })
     }
   }, [searchQuery]);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     if (!user) return;
     setIsLoading(true);
     setError(null);
     try {
       const data = await inventoryService.fetchItems();
       setItems(data);
-    } catch (err: any) {
-      setError('Failed to load inventory. Check your network or Supabase connection.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load inventory. Check your network or Supabase connection.');
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user]);
 
   useEffect(() => {
     loadData();
-  }, [user]);
+  }, [user, loadData]);
 
   const categories = useMemo(() => ['All', ...Array.from(new Set(items.map(i => i.category))).sort()], [items]);
 
@@ -281,8 +281,8 @@ const InventoryPage: React.FC<{ searchQuery?: string }> = ({ searchQuery = '' })
 
     if (sortKey && sortDir) {
       list.sort((a, b) => {
-        let av: string | number = sortKey === 'status' ? a.status : (a as any)[sortKey];
-        let bv: string | number = sortKey === 'status' ? b.status : (b as any)[sortKey];
+        let av: string | number = sortKey === 'status' ? a.status : (a as Record<string, unknown>)[sortKey] as string | number;
+        let bv: string | number = sortKey === 'status' ? b.status : (b as Record<string, unknown>)[sortKey] as string | number;
         if (typeof av === 'string') av = av.toLowerCase();
         if (typeof bv === 'string') bv = bv.toLowerCase();
         if (av < bv) return sortDir === 'asc' ? -1 : 1;
@@ -344,7 +344,7 @@ const InventoryPage: React.FC<{ searchQuery?: string }> = ({ searchQuery = '' })
     try {
       await inventoryService.deleteItem(id);
       setItems(prev => prev.filter(i => i.id !== id));
-    } catch (err) {
+    } catch {
       alert('Failed to delete item.');
     }
   };
